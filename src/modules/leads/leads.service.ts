@@ -381,39 +381,24 @@ export class LeadsService {
       });
     }
 
-    // Log one activity per request so the timeline stays readable.
+    // Log one activity per changed field so lead information updates remain readable.
     const changedFields = effectiveChanges.map(([field]) => field);
-    const previousValues: Record<string, unknown> = Object.fromEntries(
-      effectiveChanges.map(([field]) => [field, (currentLead as any)[field]]),
-    );
-    const newValues: Record<string, unknown> = Object.fromEntries(effectiveChanges);
 
-    if (changedFields.length > 0) {
-      const primaryField = changedFields[0];
-      const actionType =
-        primaryField === 'status'
-          ? ActivityActionType.STATUS_CHANGED
-          : primaryField === 'temperature'
-            ? ActivityActionType.TEMPERATURE_CHANGED
-            : ActivityActionType.LEAD_UPDATED;
+    for (const [field, newValue] of effectiveChanges) {
+      const previousValue = (currentLead as any)[field];
 
       await this.activitiesService.log({
         leadId: id,
         performedBy: userId,
         performedByName: userName,
-        actionType,
-        fieldChanged:
-          Object.keys(newValues).length === 1 ? primaryField : changedFields.join(', '),
-        previousValue:
-          Object.keys(previousValues).length === 1
-            ? previousValues[primaryField]
-            : previousValues,
-        newValue:
-          Object.keys(newValues).length === 1 ? newValues[primaryField] : newValues,
+        actionType: ActivityActionType.LEAD_UPDATED,
+        fieldChanged: field,
+        previousValue,
+        newValue,
         snapshot: {
-          changedFields,
-          previousValues,
-          newValues,
+          changedField: field,
+          previousValue,
+          newValue,
         },
       });
     }
