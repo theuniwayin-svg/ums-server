@@ -134,6 +134,7 @@ export class LeadsController {
     @Query('temperature') temperature?: string,
     @Query('source') source?: string,
     @Query('createdBy') createdBy?: string,
+    @Query('assignedTo') assignedTo?: string,
     @Query('q') q?: string,
     @Query('city') city?: string,
     @Query('course') course?: string,
@@ -150,6 +151,7 @@ export class LeadsController {
       temperature,
       source,
       createdBy,
+      assignedTo,
       q,
       city,
       course,
@@ -192,7 +194,6 @@ export class LeadsController {
       bulkUpdateDto,
       user._id.toString(),
       user.name,
-      user,
     );
   }
 
@@ -223,7 +224,6 @@ export class LeadsController {
       updateLeadDto,
       user._id.toString(),
       user.name,
-      user,
     );
   }
 

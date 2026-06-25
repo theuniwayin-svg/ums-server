@@ -247,6 +247,7 @@ export class LeadsService {
       temperature,
       source,
       createdBy,
+      assignedTo,
       q,
       city,
       course,
@@ -265,6 +266,13 @@ export class LeadsService {
     if (temperature) query.temperature = temperature;
     if (source) query.source = source;
     if (createdBy) query.createdBy = new Types.ObjectId(createdBy);
+    if (assignedTo) {
+      if (!isPrivilegedUser(user)) {
+        throw new ForbiddenException('Assigned-to filter is admin only');
+      }
+
+      query.assignedTo = new Types.ObjectId(assignedTo);
+    }
     if (city) query.city = new RegExp(city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
     if (course) query.course = new RegExp(course.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
     if (preferredCollege) {

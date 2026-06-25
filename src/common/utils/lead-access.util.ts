@@ -20,9 +20,6 @@ export function buildLeadAccessQuery(user?: LeadAccessUser) {
   }
 
   return {
-    $or: [
-      { createdBy: new Types.ObjectId(userId) },
-      { assignedTo: new Types.ObjectId(userId) },
-    ],
+    assignedTo: new Types.ObjectId(userId),
   };
 }

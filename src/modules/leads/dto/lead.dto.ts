@@ -242,6 +242,10 @@ export class LeadFiltersDto {
 
   @IsOptional()
   @IsString()
+  assignedTo?: string;
+
+  @IsOptional()
+  @IsString()
   q?: string;
 
   @IsOptional()
