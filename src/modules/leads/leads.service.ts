@@ -345,6 +345,10 @@ export class LeadsService {
 
     const { version, ...updateData } = updateLeadDto;
 
+    if (updateData.assignedTo && !isPrivilegedUser(user)) {
+      throw new ForbiddenException('Only admins can reassign leads');
+    }
+
     // Get current state for activity diff
     const currentLead = await this.leadModel
       .findOne({ _id: new Types.ObjectId(id), version })
@@ -394,6 +398,25 @@ export class LeadsService {
 
     for (const [field, newValue] of effectiveChanges) {
       const previousValue = (currentLead as any)[field];
+      let activityPreviousValue: unknown = previousValue;
+      let activityNewValue: unknown = newValue;
+
+      if (field === 'assignedTo') {
+        const previousAssigneeId = previousValue?.toString?.() || previousValue;
+        const nextAssigneeId = newValue?.toString?.() || newValue;
+
+        const [previousAssignee, nextAssignee] = await Promise.all([
+          previousAssigneeId
+            ? this.userModel.findById(previousAssigneeId).select('name').exec()
+            : Promise.resolve(null),
+          nextAssigneeId
+            ? this.userModel.findById(nextAssigneeId).select('name').exec()
+            : Promise.resolve(null),
+        ]);
+
+        activityPreviousValue = previousAssignee?.name || previousAssigneeId || null;
+        activityNewValue = nextAssignee?.name || nextAssigneeId || null;
+      }
 
       await this.activitiesService.log({
         leadId: id,
@@ -401,12 +424,12 @@ export class LeadsService {
         performedByName: userName,
         actionType: ActivityActionType.LEAD_UPDATED,
         fieldChanged: field,
-        previousValue,
-        newValue,
+        previousValue: activityPreviousValue,
+        newValue: activityNewValue,
         snapshot: {
           changedField: field,
-          previousValue,
-          newValue,
+          previousValue: activityPreviousValue,
+          newValue: activityNewValue,
         },
       });
     }

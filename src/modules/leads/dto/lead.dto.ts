@@ -138,6 +138,11 @@ export class UpdateLeadDto {
   @IsString()
   preferredCollege?: string;
 
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  assignedTo?: string;
+
   @ApiPropertyOptional({ enum: LeadSource })
   @IsOptional()
   @IsEnum(LeadSource)
@@ -259,6 +264,10 @@ export class LeadFiltersDto {
   @IsOptional()
   @IsString()
   preferredCollege?: string;
+
+  @IsOptional()
+  @IsString()
+  assignedTo?: string;
 
   @IsOptional()
   @IsString()

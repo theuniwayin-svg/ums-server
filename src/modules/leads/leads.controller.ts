@@ -224,6 +224,7 @@ export class LeadsController {
       updateLeadDto,
       user._id.toString(),
       user.name,
+      user,
     );
   }
 
