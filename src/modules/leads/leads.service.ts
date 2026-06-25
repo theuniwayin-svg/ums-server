@@ -252,6 +252,16 @@ export class LeadsService {
       });
     }
 
+    const effectiveChanges = Object.entries(updateLeadDto).filter(
+      ([field, value]) =>
+        field !== 'version' &&
+        JSON.stringify((currentLead as any)[field]) !== JSON.stringify(value),
+    );
+
+    if (effectiveChanges.length === 0) {
+      return currentLead;
+    }
+
     const updatedLead = await this.leadModel
       .findOneAndUpdate(
         { _id: new Types.ObjectId(id), version },
@@ -274,20 +284,13 @@ export class LeadsService {
     }
 
     // Log one activity per request so the timeline stays readable.
-    const changedFields = Object.keys(updateData);
-    const previousValues: Record<string, unknown> = {};
-    const newValues: Record<string, unknown> = {};
-    for (const field of changedFields) {
-      const prevValue = (currentLead as any)[field];
-      const newValue = (updateData as any)[field];
+    const changedFields = effectiveChanges.map(([field]) => field);
+    const previousValues: Record<string, unknown> = Object.fromEntries(
+      effectiveChanges.map(([field]) => [field, (currentLead as any)[field]]),
+    );
+    const newValues: Record<string, unknown> = Object.fromEntries(effectiveChanges);
 
-      if (JSON.stringify(prevValue) !== JSON.stringify(newValue)) {
-        previousValues[field] = prevValue;
-        newValues[field] = newValue;
-      }
-    }
-
-    if (Object.keys(newValues).length > 0) {
+    if (changedFields.length > 0) {
       const primaryField = changedFields[0];
       const actionType =
         primaryField === 'status'
