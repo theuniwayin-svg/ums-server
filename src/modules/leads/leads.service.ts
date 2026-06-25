@@ -12,6 +12,8 @@ import { Lead, LeadDocument, LeadSource, LeadStatus, LeadTemperature } from './s
 import {
   CreateLeadDto,
   UpdateLeadDto,
+  UpdateLeadStatusDto,
+  UpdateLeadTemperatureDto,
   BulkUpdateLeadDto,
   BulkAssignLeadDto,
   DuplicateOverrideDto,
@@ -46,6 +48,102 @@ export class LeadsService {
     }
 
     return lead;
+  }
+
+  private async updateSingleField(
+    id: string,
+    updateData: Record<string, unknown>,
+    userId: string,
+    userName: string,
+    user?: any,
+  ) {
+    const currentLead = await this.leadModel
+      .findOne({ _id: new Types.ObjectId(id), version: updateData.version as number })
+      .exec();
+
+    if (!currentLead) {
+      throw new ConflictException({
+        code: 'VERSION_CONFLICT',
+        message:
+          'This lead was updated by someone else. Please refresh and try again.',
+      });
+    }
+
+    const changedField = Object.keys(updateData).find((field) => field !== 'version');
+    if (!changedField) {
+      return currentLead;
+    }
+
+    const newValue = updateData[changedField];
+    const previousValue = (currentLead as any)[changedField];
+
+    if (JSON.stringify(previousValue) === JSON.stringify(newValue)) {
+      return currentLead;
+    }
+
+    const updatedLead = await this.leadModel
+      .findOneAndUpdate(
+        { _id: new Types.ObjectId(id), version: updateData.version as number },
+        {
+          $set: {
+            [changedField]: newValue,
+            updatedBy: new Types.ObjectId(userId),
+          },
+          $inc: { version: 1 },
+        },
+        { new: true },
+      )
+      .populate('createdBy', 'name email')
+      .populate('updatedBy', 'name email')
+      .exec();
+
+    if (!updatedLead) {
+      throw new ConflictException({
+        code: 'VERSION_CONFLICT',
+        message:
+          'This lead was updated by someone else. Please refresh and try again.',
+      });
+    }
+
+    const actionType =
+      changedField === 'status'
+        ? ActivityActionType.STATUS_CHANGED
+        : changedField === 'temperature'
+          ? ActivityActionType.TEMPERATURE_CHANGED
+          : ActivityActionType.LEAD_UPDATED;
+
+    await this.activitiesService.log({
+      leadId: id,
+      performedBy: userId,
+      performedByName: userName,
+      actionType,
+      fieldChanged: changedField,
+      previousValue,
+      newValue,
+      snapshot: {
+        changedField,
+        previousValue,
+        newValue,
+      },
+    });
+
+    this.eventEmitter.emit('lead.updated', {
+      lead: updatedLead,
+      changes: { [changedField]: newValue },
+      updatedBy: userId,
+    });
+
+    await this.auditService.log({
+      performedBy: userId,
+      performedByName: userName,
+      action: 'LEAD_UPDATED',
+      metadata: {
+        leadId: id,
+        changedFields: [changedField],
+      },
+    });
+
+    return updatedLead;
   }
 
   async create(
@@ -337,6 +435,46 @@ export class LeadsService {
     });
 
     return updatedLead;
+  }
+
+  async updateStatus(
+    id: string,
+    dto: UpdateLeadStatusDto,
+    userId: string,
+    userName: string,
+    user?: any,
+  ) {
+    if (user) {
+      await this.findAccessibleLeadOrThrow(id, user);
+    }
+
+    return this.updateSingleField(
+      id,
+      { version: dto.version, status: dto.status },
+      userId,
+      userName,
+      user,
+    );
+  }
+
+  async updateTemperature(
+    id: string,
+    dto: UpdateLeadTemperatureDto,
+    userId: string,
+    userName: string,
+    user?: any,
+  ) {
+    if (user) {
+      await this.findAccessibleLeadOrThrow(id, user);
+    }
+
+    return this.updateSingleField(
+      id,
+      { version: dto.version, temperature: dto.temperature },
+      userId,
+      userName,
+      user,
+    );
   }
 
   async softDelete(id: string, userId: string, userName: string, user?: any) {

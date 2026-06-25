@@ -165,6 +165,26 @@ export class UpdateLeadDto {
   tags?: string[];
 }
 
+export class UpdateLeadStatusDto {
+  @ApiPropertyOptional()
+  @IsNumber()
+  version: number;
+
+  @ApiProperty({ enum: LeadStatus })
+  @IsEnum(LeadStatus)
+  status: string;
+}
+
+export class UpdateLeadTemperatureDto {
+  @ApiPropertyOptional()
+  @IsNumber()
+  version: number;
+
+  @ApiProperty({ enum: LeadTemperature })
+  @IsEnum(LeadTemperature)
+  temperature: string;
+}
+
 export class BulkUpdateLeadDto {
   @ApiProperty()
   @IsArray()

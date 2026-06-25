@@ -28,6 +28,8 @@ import { LeadsService } from './leads.service';
 import {
   CreateLeadDto,
   UpdateLeadDto,
+  UpdateLeadStatusDto,
+  UpdateLeadTemperatureDto,
   BulkUpdateLeadDto,
   BulkAssignLeadDto,
   DuplicateOverrideDto,
@@ -219,6 +221,40 @@ export class LeadsController {
     return this.leadsService.update(
       id,
       updateLeadDto,
+      user._id.toString(),
+      user.name,
+      user,
+    );
+  }
+
+  @Patch(':id/status')
+  @ApiOperation({ summary: 'Update lead status' })
+  @ApiResponse({ status: 409, description: 'Version conflict' })
+  updateStatus(
+    @Param('id') id: string,
+    @Body() body: UpdateLeadStatusDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.leadsService.updateStatus(
+      id,
+      body,
+      user._id.toString(),
+      user.name,
+      user,
+    );
+  }
+
+  @Patch(':id/temperature')
+  @ApiOperation({ summary: 'Update lead temperature' })
+  @ApiResponse({ status: 409, description: 'Version conflict' })
+  updateTemperature(
+    @Param('id') id: string,
+    @Body() body: UpdateLeadTemperatureDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.leadsService.updateTemperature(
+      id,
+      body,
       user._id.toString(),
       user.name,
       user,
