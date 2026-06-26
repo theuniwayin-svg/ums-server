@@ -10,8 +10,13 @@ const logger = new Logger('DatabaseModule');
     MongooseModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        const uri = config.get<string>('MONGODB_URI');
+        const uri =
+          config.get<string>('MONGODB_URI') || config.get<string>('MONGO_URI');
         const nodeEnv = config.get<string>('NODE_ENV');
+
+        if (!uri) {
+          throw new Error('Missing MongoDB connection string');
+        }
 
         if (nodeEnv === 'development') {
           mongoose.set('debug', true);

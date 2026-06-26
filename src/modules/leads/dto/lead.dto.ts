@@ -267,10 +267,6 @@ export class LeadFiltersDto {
 
   @IsOptional()
   @IsString()
-  assignedTo?: string;
-
-  @IsOptional()
-  @IsString()
   dateFrom?: string;
 
   @IsOptional()

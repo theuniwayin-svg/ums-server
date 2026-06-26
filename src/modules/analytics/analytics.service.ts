@@ -2,13 +2,15 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Lead, LeadDocument, LeadStatus, LeadTemperature, LeadSource } from '../leads/schemas/lead.schema';
-import { Activity, ActivityDocument } from '../activities/schemas/activity.schema';
+import { Activity, ActivityActionType, ActivityDocument } from '../activities/schemas/activity.schema';
 import { FollowUp, FollowUpDocument } from '../follow-ups/schemas/follow-up.schema';
+import { User, UserDocument, UserRole } from '../users/schemas/user.schema';
 
 @Injectable()
 export class AnalyticsService {
   constructor(
     @InjectModel(Lead.name) private leadModel: Model<LeadDocument>,
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(Activity.name) private activityModel: Model<ActivityDocument>,
     @InjectModel(FollowUp.name) private followUpModel: Model<FollowUpDocument>,
   ) {}
@@ -104,42 +106,91 @@ export class AnalyticsService {
     const startOfWeek = new Date();
     startOfWeek.setDate(startOfWeek.getDate() - 7);
 
-    const result = await this.activityModel.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: startOfWeek },
-        },
-      },
-      {
-        $group: {
-          _id: '$performedBy',
-          name: { $first: '$performedByName' },
-          activitiesThisWeek: { $sum: 1 },
-          leadsCreated: {
-            $sum: {
-              $cond: [{ $eq: ['$actionType', 'LEAD_CREATED'] }, 1, 0],
+    const [users, leadRows, activityRows, admissionRows, totalLeads, totalAdmissions] =
+      await Promise.all([
+        this.userModel
+          .find({
+            isDeleted: { $ne: true },
+            role: { $in: [UserRole.ADMIN, UserRole.STAFF] },
+          })
+          .select('_id name role')
+          .sort({ name: 1 })
+          .exec(),
+        this.leadModel.aggregate([
+          { $match: { isDeleted: { $ne: true } } },
+          { $group: { _id: '$createdBy', count: { $sum: 1 } } },
+        ]),
+        this.activityModel.aggregate([
+          {
+            $match: {
+              createdAt: { $gte: startOfWeek },
             },
           },
-          admissions: {
-            $sum: {
-              $cond: [
-                {
-                  $and: [
-                    { $eq: ['$actionType', 'STATUS_CHANGED'] },
-                    { $eq: ['$newValue', 'Admission Confirmed'] },
-                  ],
-                },
-                1,
-                0,
-              ],
+          {
+            $group: {
+              _id: '$performedBy',
+              activitiesThisWeek: { $sum: 1 },
             },
           },
-        },
-      },
-      { $sort: { activitiesThisWeek: -1 } },
-    ]);
+        ]),
+        this.activityModel.aggregate([
+          {
+            $match: {
+              createdAt: { $gte: startOfWeek },
+              actionType: ActivityActionType.STATUS_CHANGED,
+              newValue: LeadStatus.ADMISSION_CONFIRMED,
+            },
+          },
+          {
+            $group: {
+              _id: {
+                performedBy: '$performedBy',
+                leadId: '$leadId',
+              },
+            },
+          },
+          {
+            $group: {
+              _id: '$_id.performedBy',
+              admissions: { $sum: 1 },
+            },
+          },
+        ]),
+        this.leadModel.countDocuments({ isDeleted: { $ne: true } }),
+        this.leadModel.countDocuments({
+          isDeleted: { $ne: true },
+          status: LeadStatus.ADMISSION_CONFIRMED,
+        }),
+      ]);
 
-    return { staff: result };
+    const leadCountByUser = new Map(
+      leadRows.map((row: any) => [row._id?.toString?.() ?? String(row._id), row.count]),
+    );
+    const activityCountByUser = new Map(
+      activityRows.map((row: any) => [
+        row._id?.toString?.() ?? String(row._id),
+        row.activitiesThisWeek,
+      ]),
+    );
+    const admissionCountByUser = new Map(
+      admissionRows.map((row: any) => [row._id?.toString?.() ?? String(row._id), row.admissions]),
+    );
+
+    const staff = users.map((user: any) => {
+      const userId = user._id.toString();
+      const isAdmin = [UserRole.ADMIN, UserRole.SUPERADMIN].includes(user.role as UserRole);
+
+      return {
+        _id: userId,
+        name: user.name,
+        role: user.role,
+        leadsCreated: isAdmin ? totalLeads : leadCountByUser.get(userId) ?? 0,
+        admissions: isAdmin ? totalAdmissions : admissionCountByUser.get(userId) ?? 0,
+        activitiesThisWeek: activityCountByUser.get(userId) ?? 0,
+      };
+    });
+
+    return { staff };
   }
 
   async getTrends(days = 30) {

@@ -15,6 +15,8 @@ if (!SEED_ADMIN_PASSWORD) {
   process.exit(1);
 }
 
+const adminPassword = SEED_ADMIN_PASSWORD;
+
 const UserSchema = new mongoose.Schema(
   {
     name: String,
@@ -42,7 +44,7 @@ async function seedFirstAdmin() {
     return;
   }
 
-  const passwordHash = await bcrypt.hash(SEED_ADMIN_PASSWORD, 12);
+  const passwordHash = await bcrypt.hash(adminPassword, 12);
 
   await UserModel.create({
     name: 'Admin',

@@ -42,10 +42,16 @@ export class AuthController {
 
     const isProduction = this.configService.get('NODE_ENV') === 'production';
 
+    // When running in production behind a separate frontend origin (e.g. Render),
+    // browsers require cross-site cookies to use `SameSite=None` and `Secure`.
+    // Use the presence of a FRONTEND_URL env to decide.
+    const frontendUrl = this.configService.get('FRONTEND_URL');
+    const sameSite = isProduction ? (frontendUrl ? 'none' : 'strict') : 'lax';
+
     res.cookie('refresh_token', refreshToken, {
       httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? 'strict' : 'lax',
+      secure: isProduction, // secure should be true in production
+      sameSite: sameSite as 'lax' | 'strict' | 'none',
       path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
@@ -72,10 +78,13 @@ export class AuthController {
 
     const isProduction = this.configService.get('NODE_ENV') === 'production';
 
+    const frontendUrl = this.configService.get('FRONTEND_URL');
+    const sameSite = isProduction ? (frontendUrl ? 'none' : 'strict') : 'lax';
+
     res.cookie('refresh_token', refreshToken, {
       httpOnly: true,
       secure: isProduction,
-      sameSite: isProduction ? 'strict' : 'lax',
+      sameSite: sameSite as 'lax' | 'strict' | 'none',
       path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
