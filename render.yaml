@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: uniwayin-ums-api
+    env: node
+    buildCommand: pnpm install && pnpm run build
+    startCommand: node dist/main.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        value: mongodb+srv://theuniwayin_db_user:qH5sMDXybjMgKRsu@unuway.yoelf6l.mongodb.net
+      - key: JWT_ACCESS_SECRET
+        # replace with a secret ≥16 characters
+        value: REPLACE_WITH_ACCESS_SECRET
+      - key: JWT_REFRESH_SECRET
+        # replace with a secret ≥16 characters
+        value: REPLACE_WITH_REFRESH_SECRET
+      - key: RESEND_API_KEY
+        value: REPLACE_WITH_RESEND_API_KEY
