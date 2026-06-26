@@ -8,7 +8,8 @@ import { ResponseTransformInterceptor } from './common/interceptors/response-tra
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  try {
+    const app = await NestFactory.create(AppModule, { bufferLogs: true });
 
   // Pino logger
   app.useLogger(app.get(Logger));
@@ -72,9 +73,13 @@ async function bootstrap() {
   const port = Number(process.env.PORT) || 3001;
   await app.listen(port, '0.0.0.0');
 
-  const logger = app.get(Logger);
-  logger.log(`🚀 UMS API running on port ${port}`);
-  logger.log(`📖 Swagger docs: http://localhost:${port}/api/docs`);
+    const logger = app.get(Logger);
+    logger.log(`🚀 UMS API running on port ${port}`);
+    logger.log(`📖 Swagger docs: http://localhost:${port}/api/docs`);
+  } catch (err) {
+    console.error('❌ Failed to start application:', err);
+    process.exit(1);
+  }
 }
 
 bootstrap();
