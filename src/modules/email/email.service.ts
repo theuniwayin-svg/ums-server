@@ -13,13 +13,20 @@ interface FollowUpReminderParams {
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
-  private resend: Resend;
+  private resend?: Resend;
 
   constructor(private configService: ConfigService) {
-    this.resend = new Resend(this.configService.get<string>('RESEND_API_KEY'));
+    const apiKey = this.configService.get<string>('RESEND_API_KEY');
+    if (apiKey) {
+      this.resend = new Resend(apiKey);
+    }
   }
 
   async sendFollowUpReminder(params: FollowUpReminderParams) {
+    if (!this.resend) {
+      throw new Error('RESEND_API_KEY is not configured');
+    }
+
     const { toEmail, toName, studentName, note, scheduledFor } = params;
 
     const formattedDate = scheduledFor.toLocaleString('en-IN', {
