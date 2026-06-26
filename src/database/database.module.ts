@@ -11,7 +11,9 @@ const logger = new Logger('DatabaseModule');
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
         const uri =
-          config.get<string>('MONGODB_URI') || config.get<string>('MONGO_URI');
+          config.get<string>('MONGODB_URI') ||
+          config.get<string>('MONGO_URI') ||
+          config.get<string>('DATABASE_URL');
         const nodeEnv = config.get<string>('NODE_ENV');
 
         if (!uri) {
