@@ -41,12 +41,31 @@ async function bootstrap() {
   });
 
   // CORS
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
   app.enableCors({
-    origin: [frontendUrl, 'http://localhost:3000'],
-    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like server-to-server or curl)
+      if (!origin) return callback(null, true);
+
+      const allowedOrigins = [
+        process.env.FRONTEND_URL,
+        'http://localhost:3000',
+        'http://localhost:3001',
+        'https://ums.theuniway.co.in',
+      ].filter(Boolean);
+
+      // Allow if origin is in the explicit list OR if it's a Vercel deployment URL
+      if (
+        allowedOrigins.includes(origin) ||
+        origin.endsWith('.vercel.app')
+      ) {
+        callback(null, true);
+      } else {
+        callback(new Error(`Origin ${origin} not allowed by CORS`));
+      }
+    },
+    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
     credentials: true,
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
   });
 
   // Swagger
