@@ -4,6 +4,7 @@ import {
   ConflictException,
   BadRequestException,
   ForbiddenException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -332,13 +333,9 @@ export class LeadsService {
         meta: { total, page: Number(page), limit: Number(limit) },
       };
     } catch (err: any) {
-      // Guard against CastError from corrupted ObjectId fields (e.g. assignedTo="")
+      console.error('Error fetching leads:', err);
       if (err.name === 'CastError') {
-        return {
-          data: [],
-          meta: { total: 0, page: Number(page), limit: Number(limit) },
-          _warning: 'Query failed due to a data integrity issue. Please contact support.',
-        };
+        throw new InternalServerErrorException('Data integrity error or invalid query format: ' + err.message);
       }
       throw err;
     }
