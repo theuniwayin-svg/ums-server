@@ -271,7 +271,11 @@ export class LeadsService {
         throw new ForbiddenException('Assigned-to filter is admin only');
       }
 
-      query.assignedTo = new Types.ObjectId(assignedTo);
+      if (assignedTo === 'unassigned') {
+        query.assignedTo = null;
+      } else {
+        query.assignedTo = new Types.ObjectId(assignedTo);
+      }
     }
     if (city) query.city = new RegExp(city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
     if (course) query.course = new RegExp(course.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
