@@ -164,9 +164,12 @@ export class LeadsService {
       });
     }
 
-    // Pre-check for duplicate phone
+    // Pre-check for duplicate phone (check only last 10 digits)
+    const rawPhone = createLeadDto.phone.replace(/\D/g, '');
+    const last10Phone = rawPhone.slice(-10);
+
     const existingByPhone = await this.leadModel
-      .findOne({ phone: createLeadDto.phone })
+      .findOne({ phone: { $regex: new RegExp(`${last10Phone}$`) } })
       .select('_id studentName')
       .exec();
 
@@ -182,8 +185,11 @@ export class LeadsService {
     }
 
     if (createLeadDto.parentPhone) {
+      const rawParentPhone = createLeadDto.parentPhone.replace(/\D/g, '');
+      const last10Parent = rawParentPhone.slice(-10);
+
       const existingByParentPhone = await this.leadModel
-        .findOne({ parentPhone: createLeadDto.parentPhone })
+        .findOne({ parentPhone: { $regex: new RegExp(`${last10Parent}$`) } })
         .select('_id studentName')
         .exec();
 
@@ -413,15 +419,27 @@ export class LeadsService {
       mongoUpdate.$unset = unsetFields;
     }
 
-    const updatedLead = await this.leadModel
-      .findOneAndUpdate(
-        { _id: new Types.ObjectId(id), version },
-        mongoUpdate,
-        { new: true },
-      )
-      .populate('createdBy', 'name email')
-      .populate('updatedBy', 'name email')
-      .exec();
+    let updatedLead;
+    try {
+      updatedLead = await this.leadModel
+        .findOneAndUpdate(
+          { _id: new Types.ObjectId(id), version },
+          mongoUpdate,
+          { new: true },
+        )
+        .populate('createdBy', 'name email')
+        .populate('updatedBy', 'name email')
+        .exec();
+    } catch (err: any) {
+      if (err.code === 11000) {
+        throw new ConflictException({
+          code: 'DUPLICATE_PHONE',
+          message: 'A lead with this phone number already exists',
+          details: { keyPattern: err.keyPattern },
+        });
+      }
+      throw err;
+    }
 
     if (!updatedLead) {
       throw new ConflictException({
