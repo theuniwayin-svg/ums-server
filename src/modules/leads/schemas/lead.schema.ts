@@ -127,9 +127,7 @@ export class Lead {
 
 export const LeadSchema = SchemaFactory.createForClass(Lead);
 
-// MongoDB Indexes
-LeadSchema.index({ phone: 1 }, { unique: true });
-LeadSchema.index({ parentPhone: 1 }, { sparse: true });
+// MongoDB Indexes (do NOT add phone/parentPhone here — already declared via @Prop)
 LeadSchema.index({ status: 1 });
 LeadSchema.index({ temperature: 1 });
 LeadSchema.index({ source: 1 });

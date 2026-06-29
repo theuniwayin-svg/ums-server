@@ -309,23 +309,35 @@ export class LeadsService {
     const sortOptions: any = { [sortBy]: sortOrder };
     const skip = (page - 1) * limit;
 
-    const [data, total] = await Promise.all([
-      this.leadModel
-        .find(query)
-        .populate('createdBy', 'name email')
-        .populate('updatedBy', 'name email')
-        .populate('assignedTo', 'name email role')
-        .sort(sortOptions)
-        .skip(skip)
-        .limit(Number(limit))
-        .exec(),
-      this.leadModel.countDocuments(query),
-    ]);
+    try {
+      const [data, total] = await Promise.all([
+        this.leadModel
+          .find(query)
+          .populate('createdBy', 'name email')
+          .populate('updatedBy', 'name email')
+          .populate('assignedTo', 'name email role')
+          .sort(sortOptions)
+          .skip(skip)
+          .limit(Number(limit))
+          .exec(),
+        this.leadModel.countDocuments(query),
+      ]);
 
-    return {
-      data,
-      meta: { total, page: Number(page), limit: Number(limit) },
-    };
+      return {
+        data,
+        meta: { total, page: Number(page), limit: Number(limit) },
+      };
+    } catch (err: any) {
+      // Guard against CastError from corrupted ObjectId fields (e.g. assignedTo="")
+      if (err.name === 'CastError') {
+        return {
+          data: [],
+          meta: { total: 0, page: Number(page), limit: Number(limit) },
+          _warning: 'Query failed due to a data integrity issue. Please contact support.',
+        };
+      }
+      throw err;
+    }
   }
 
   async findById(id: string, user?: any) {
@@ -345,7 +357,15 @@ export class LeadsService {
 
     const { version, ...updateData } = updateLeadDto;
 
-    if (updateData.assignedTo && !isPrivilegedUser(user)) {
+    // Sanitize assignedTo: empty string must become null (not an invalid ObjectId)
+    if ('assignedTo' in updateData) {
+      const raw = (updateData as any).assignedTo;
+      if (!raw || raw === '') {
+        (updateData as any).assignedTo = null;
+      }
+    }
+
+    if ((updateData as any).assignedTo !== undefined && !isPrivilegedUser(user)) {
       throw new ForbiddenException('Only admins can reassign leads');
     }
 
@@ -372,13 +392,30 @@ export class LeadsService {
       return currentLead;
     }
 
+    // Build $set and $unset separately so null assignedTo properly clears the field
+    const setFields: Record<string, unknown> = { updatedBy: new Types.ObjectId(userId) };
+    const unsetFields: Record<string, unknown> = {};
+
+    for (const [field, value] of Object.entries(updateData)) {
+      if (value === null && field === 'assignedTo') {
+        unsetFields[field] = '';
+      } else {
+        setFields[field] = value;
+      }
+    }
+
+    const mongoUpdate: Record<string, unknown> = {
+      $set: setFields,
+      $inc: { version: 1 },
+    };
+    if (Object.keys(unsetFields).length > 0) {
+      mongoUpdate.$unset = unsetFields;
+    }
+
     const updatedLead = await this.leadModel
       .findOneAndUpdate(
         { _id: new Types.ObjectId(id), version },
-        {
-          $set: { ...updateData, updatedBy: new Types.ObjectId(userId) },
-          $inc: { version: 1 },
-        },
+        mongoUpdate,
         { new: true },
       )
       .populate('createdBy', 'name email')
@@ -415,7 +452,7 @@ export class LeadsService {
         ]);
 
         activityPreviousValue = previousAssignee?.name || previousAssigneeId || null;
-        activityNewValue = nextAssignee?.name || nextAssigneeId || null;
+        activityNewValue = nextAssignee?.name || nextAssigneeId || 'Unassigned';
       }
 
       await this.activitiesService.log({
@@ -638,17 +675,22 @@ export class LeadsService {
       throw new BadRequestException('Cannot assign more than 100 leads at once');
     }
 
-    const staff = await this.userModel
-      .findOne({ _id: new Types.ObjectId(assignedTo), isActive: true })
-      .select('name email role')
-      .exec();
+    // Handle unassign (assignedTo is null/empty)
+    const isUnassign = !assignedTo || assignedTo === '';
 
-    if (!staff) {
-      throw new BadRequestException('Assigned user not found or inactive');
-    }
+    if (!isUnassign) {
+      const staff = await this.userModel
+        .findOne({ _id: new Types.ObjectId(assignedTo), isActive: true })
+        .select('name email role')
+        .exec();
 
-    if (![UserRole.ADMIN, UserRole.STAFF].includes(staff.role as UserRole)) {
-      throw new BadRequestException('Leads can only be assigned to staff or admin users');
+      if (!staff) {
+        throw new BadRequestException('Assigned user not found or inactive');
+      }
+
+      if (![UserRole.ADMIN, UserRole.STAFF].includes(staff.role as UserRole)) {
+        throw new BadRequestException('Leads can only be assigned to staff or admin users');
+      }
     }
 
     const results = { updated: 0, failed: 0, errors: [] as any[] };
@@ -662,13 +704,21 @@ export class LeadsService {
           continue;
         }
 
-        await this.leadModel.findByIdAndUpdate(leadId, {
-          $set: {
-            assignedTo: new Types.ObjectId(assignedTo),
-            updatedBy: new Types.ObjectId(userId),
-          },
-          $inc: { version: 1 },
-        });
+        if (isUnassign) {
+          await this.leadModel.findByIdAndUpdate(leadId, {
+            $unset: { assignedTo: '' },
+            $set: { updatedBy: new Types.ObjectId(userId) },
+            $inc: { version: 1 },
+          });
+        } else {
+          await this.leadModel.findByIdAndUpdate(leadId, {
+            $set: {
+              assignedTo: new Types.ObjectId(assignedTo),
+              updatedBy: new Types.ObjectId(userId),
+            },
+            $inc: { version: 1 },
+          });
+        }
 
         await this.activitiesService.log({
           leadId,
@@ -677,7 +727,7 @@ export class LeadsService {
           actionType: ActivityActionType.FIELD_UPDATED,
           fieldChanged: 'assignedTo',
           previousValue: (lead as any).assignedTo?.toString?.() || null,
-          newValue: assignedTo,
+          newValue: isUnassign ? null : assignedTo,
         });
 
         results.updated++;
@@ -690,15 +740,10 @@ export class LeadsService {
     await this.auditService.log({
       performedBy: userId,
       performedByName: userName,
-      action: 'LEADS_ASSIGNED',
+      action: isUnassign ? 'LEADS_UNASSIGNED' : 'LEADS_ASSIGNED',
       metadata: {
         leadIds,
-        assignedTo: {
-          _id: staff._id.toString(),
-          name: staff.name,
-          email: staff.email,
-          role: staff.role,
-        },
+        assignedTo: isUnassign ? null : assignedTo,
         results,
       },
     });
