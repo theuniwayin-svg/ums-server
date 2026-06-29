@@ -266,7 +266,7 @@ export class LeadsService {
     if (temperature) query.temperature = temperature;
     if (source) query.source = source;
     if (createdBy) query.createdBy = new Types.ObjectId(createdBy);
-    if (assignedTo) {
+    if (assignedTo && assignedTo !== 'undefined' && assignedTo !== 'null' && assignedTo.trim() !== '') {
       if (!isPrivilegedUser(user)) {
         throw new ForbiddenException('Assigned-to filter is admin only');
       }
