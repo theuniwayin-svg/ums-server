@@ -62,6 +62,20 @@ class FollowUpEmbed {
 
 const FollowUpEmbedSchema = SchemaFactory.createForClass(FollowUpEmbed);
 
+@Schema({ _id: false })
+class LatestNoteEmbed {
+  @Prop()
+  content: string;
+
+  @Prop()
+  createdByName: string;
+
+  @Prop()
+  createdAt: Date;
+}
+
+const LatestNoteEmbedSchema = SchemaFactory.createForClass(LatestNoteEmbed);
+
 @Schema({ timestamps: true, optimisticConcurrency: true })
 export class Lead {
   @Prop({ required: true, trim: true })
@@ -105,6 +119,9 @@ export class Lead {
 
   @Prop({ type: FollowUpEmbedSchema })
   followUp: FollowUpEmbed;
+
+  @Prop({ type: LatestNoteEmbedSchema })
+  latestNote: LatestNoteEmbed;
 
   @Prop({ default: 0 })
   version: number;

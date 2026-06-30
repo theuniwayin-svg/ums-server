@@ -65,6 +65,19 @@ export class NotesService {
       content: sanitizedContent,
     });
 
+    // Bump lead's updatedAt and store the latest note snapshot so the lead
+    // rises to the top of the table and the mobile card can show the snippet.
+    await this.leadModel.findByIdAndUpdate(leadId, {
+      $set: {
+        updatedAt: new Date(),
+        latestNote: {
+          content: sanitizedContent,
+          createdByName: userName,
+          createdAt: note.createdAt,
+        },
+      },
+    });
+
     await this.activitiesService.log({
       leadId,
       performedBy: userId,
