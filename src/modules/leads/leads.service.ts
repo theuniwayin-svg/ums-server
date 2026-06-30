@@ -279,7 +279,8 @@ export class LeadsService {
       }
 
       if (assignedTo === 'unassigned') {
-        query.assignedTo = null;
+        // $in: [null] matches both null values AND documents where the field doesn't exist
+        query.assignedTo = { $in: [null, undefined] };
       } else {
         query.assignedTo = new Types.ObjectId(assignedTo);
       }
