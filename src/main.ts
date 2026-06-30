@@ -50,13 +50,17 @@ async function bootstrap() {
         process.env.FRONTEND_URL,
         'http://localhost:3000',
         'http://localhost:3001',
+        'http://localhost:3002',
+        'http://localhost:3003',
+        'http://localhost:4000',
         'https://ums.theuniway.co.in',
       ].filter(Boolean);
 
-      // Allow if origin is in the explicit list OR if it's a Vercel deployment URL
+      // Allow if origin is in the explicit list, a Vercel deployment URL, or any localhost
       if (
         allowedOrigins.includes(origin) ||
-        origin.endsWith('.vercel.app')
+        origin.endsWith('.vercel.app') ||
+        /^http:\/\/localhost:\d+$/.test(origin)
       ) {
         callback(null, true);
       } else {
