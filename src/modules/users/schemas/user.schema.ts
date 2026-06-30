@@ -44,7 +44,7 @@ export class User {
 export const UserSchema = SchemaFactory.createForClass(User);
 
 // Exclude soft-deleted users by default
-UserSchema.pre(/^find/, function (this: any) {
+UserSchema.pre(['find', 'findOne', 'findOneAndUpdate', 'countDocuments', 'count'], function (this: any) {
   if (this._conditions && this._conditions.isDeleted === undefined) {
     this.where({ isDeleted: { $ne: true } });
   }

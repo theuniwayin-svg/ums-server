@@ -162,7 +162,7 @@ LeadSchema.index(
 );
 
 // Exclude soft-deleted leads by default
-LeadSchema.pre(/^find/, function (this: any) {
+LeadSchema.pre(['find', 'findOne', 'findOneAndUpdate', 'countDocuments', 'count'], function (this: any) {
   if (this._conditions && this._conditions.isDeleted === undefined) {
     this.where({ isDeleted: { $ne: true } });
   }

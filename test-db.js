@@ -2,10 +2,19 @@ require('dotenv').config();
 const mongoose = require('mongoose');
 
 async function test() {
-  await mongoose.connect(process.env.MONGODB_URI);
-  const users = await mongoose.connection.db.collection('users').find({}).toArray();
-  console.log('Users in DB:');
-  users.forEach(u => console.log(u.email, u.passwordHash ? '(has password)' : '(no password)'));
-  await mongoose.disconnect();
+  try {
+    await mongoose.connect(process.env.MONGODB_URI);
+    const db = mongoose.connection.db;
+    
+    const collections = await db.listCollections().toArray();
+    console.log('Collections:');
+    for (const col of collections) {
+      console.log(`- ${col.name} (docs: ${await db.collection(col.name).countDocuments()})`);
+    }
+  } catch (err) {
+    console.error(err);
+  } finally {
+    await mongoose.disconnect();
+  }
 }
 test();
